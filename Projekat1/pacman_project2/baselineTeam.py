@@ -47,6 +47,7 @@ def createTeam(firstIndex, secondIndex, isRed,
   any extra arguments, so you should make sure that the default
   behavior is what you want for the nightly contest.
   """
+
   return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
 ##########
