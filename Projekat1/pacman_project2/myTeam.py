@@ -4,7 +4,7 @@
 # educational purposes provided that (1) you do not distribute or publish
 # solutions, (2) you retain this notice, and (3) you provide clear
 # attribution to UC Berkeley, including a link to http://ai.berkeley.edu.
-# 
+#
 # Attribution Information: The Pacman AI projects were developed at UC Berkeley.
 # The core projects and autograders were primarily created by John DeNero
 # (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
@@ -117,24 +117,39 @@ class OffensiveAgent(CaptureAgent):
 
       #kad smo presli preko i bezimo od neprijatelja, MORAMO DA GA VRATIMOOOOOOO KUCI
       if (myState.isPacman):
-        for ghost in invaders:
-          ghostpos = ghost.getPosition()
-          neighbors = Actions.getLegalNeighbors(ghostpos, walls)
-          if (newx, newy) == ghostpos and ghost.scaredTimer == 0:
-            features["normalGhosts"] = 1 #pojesce nas normalan duh, ne idemo na hranu to smo vec resili
-          elif (newx, newy) == ghostpos and ghost.scaredTimer > 0:
-            features["normalGhosts"] = 0
-            features["eatFood"] = 1
-          elif ((newx, newy) in neighbors) and (ghost.scaredTimer == 0):
-            features["normalGhosts"] = 0.5
-          elif ((newx, newy) in neighbors) and ghost.scaredTimer > 0:
-            features["normalGhosts"] = 0 #ignorisemo situaciju, idemo ka hrani!!!!
+        if myState.numCarrying >= 1:
+          print("Nasa situacija")
+          newFood = self.getFoodYouAreDefending(gameState).asList()
+          minDist =  [self.getMazeDistance(myPos, a) for a in newFood]
+        #  features['distanceToFood'] = min(minDist)
+          features['backToSafeZone'] = min(minDist)
+          features['normalGhosts'] = 1 # NE JEDI
+         # print(features["distanceToFood"])
+          #return features
+        else:
+          dists = [self.getMazeDistance(myPos, a.getPosition()) for a in invaders]
+          features['ghostInvaders'] = min(dists)
+          for ghost in invaders:
+            ghostpos = ghost.getPosition()
+            neighbors = Actions.getLegalNeighbors(ghostpos, walls)
+            if (newx, newy) == ghostpos and ghost.scaredTimer == 0:
+              features["normalGhosts"] = 1 #pojesce nas normalan duh, ne idemo na hranu to smo vec resili
+          #    features["run"] += 100
+            elif (newx, newy) == ghostpos and ghost.scaredTimer > 0:
+              features["normalGhosts"] = 0
+              features["eatFood"] = 1
+            elif ((newx, newy) in neighbors) and (ghost.scaredTimer == 0):
+              features["normalGhosts"] = 0.5
+           #   features["run"] += 100
+            elif ((newx, newy) in neighbors) and ghost.scaredTimer > 0:
+              features["normalGhosts"] = 0 #ignorisemo situaciju, idemo ka hrani!!!!
 
       #kad smo duh, jurimo neprijatelja ako nismo uplaseni
       if not myState.isPacman:
         for pacman in defenders:
           pacmanpos = pacman.getPosition()
           neighbors = Actions.getLegalNeighbors(pacmanpos, walls)
+          #features["normalGhosts"] = 0
           features["normalGhosts"] = 1  # ignorisemo situaciju
           #features["eatFood"] = 50  # ako nam neprijatelj u komsiluku, idmeo da ga POJEDEMO, potencijalno dobar potez
           dists = [self.getMazeDistance(myPos, a.getPosition()) for a in defenders]
@@ -144,12 +159,15 @@ class OffensiveAgent(CaptureAgent):
             features["eatFood"] = 100
             features["normalGhosts"] = 1
           elif (newx, newy) == pacmanpos and myState.scaredTimer > 0: #idemo prema hrani da bismo pobegli od pacmana
-            features["normalGhosts"] = 0
+            features["normalGhosts"] = 1 # bila 0
+            features["scaredGhost"] = 1
           elif ((newx, newy) in neighbors) and (myState.scaredTimer == 0):
+            #features["normalGhosts"] = 0
             features["normalGhosts"] = 1 # ignorisemo situaciju
             features["eatFood"] = 100 #ako nam neprijatelj u komsiluku, idmeo da ga POJEDEMO, potencijalno dobar potez
           elif ((newx, newy) in neighbors) and myState.scaredTimer > 0:
-            features["normalGhosts"] = 0 #ignorisemo situaciju
+            features["normalGhosts"] = 1 #ignorisemo situaciju, bila 0
+            features["scaredGhost"] = 1
 
 
       #na pocetku smo duhovi, nismo uplaseni, nemamo hranu blizu, nemamo neprijatelje, cilj je da predjemo preko
@@ -169,15 +187,16 @@ class OffensiveAgent(CaptureAgent):
           if len(tempFood) == 0:
             tempFood = foodList
           mazedist = [self.getMazeDistance((newx, newy), food) for food in tempFood]
-        if min(mazedist) is not None:
-          walldimensions = walls.width * walls.height
-          features["distanceToFood"] = float(min(mazedist)) / walldimensions
+          if min(mazedist) is not None:
+            walldimensions = walls.width * walls.height
+            features["distanceToFood"] = float(min(mazedist)) / walldimensions
 
       #treba da ga vratimo kuci
       return features
 
     def getWeights(self, gameState, action):
-      return {'normalGhosts':-20, 'distanceToFood': -1, 'eatFood': 1, 'invaderDistance': -10}
+      return {'normalGhosts':-20, 'distanceToFood': -1, 'eatFood': 1, 'invaderDistance': -10, 'run': -10,
+              'ghostInvaders': 0.00195, 'scaredGhost': -20, 'backToSafeZone': -1, 'reverse': 10}
 
 
 class DefensiveAgent(CaptureAgent):
@@ -225,6 +244,7 @@ class DefensiveAgent(CaptureAgent):
     return features * weights
 
   def getFeatures(self, gameState, action):
+
     features = util.Counter()
     successor = self.getSuccessor(gameState, action)
 
@@ -247,10 +267,49 @@ class DefensiveAgent(CaptureAgent):
     rev = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
     if action == rev: features['reverse'] = 1
 
+    """
+    features = util.Counter()
+    successor = self.getSuccessor(gameState, action)
+    food1 = self.getFood(gameState)
+    capsules = gameState.getCapsules()
+    foodList = food1.asList()
+    walls = gameState.getWalls()
+    x, y = gameState.getAgentState(self.index).getPosition()
+    vx, vy = Actions.directionToVector(action)  # vektor pomeraja
+    newx = int(x + vx)  # nova pozicija x
+    newy = int(y + vy)  # nova pozicija y
+
+    # Get set of invaders and defenders
+    enemies = [gameState.getAgentState(a) for a in self.getOpponents(gameState)]
+    invaders = [a for a in enemies if a.isPacman and a.getPosition() != None]  # invidersi su pacmani
+    defenders = [a for a in enemies if not a.isPacman and a.getPosition() != None]  # du duhovi
+
+    myState = successor.getAgentState(self.index)
+    myPos = myState.getPosition()
+    # ako nema invidersa mi prelazimo na drugu stranu da jedemo
+    if(not myState.isPacman):
+      if(len(invaders) == 0 and len(foodList) > 0):
+        #idi ka hrani
+        tempFood = []
+        for food in foodList:
+          food_x, food_y = food
+          adjustedindex = self.index - self.index % 2
+          check1 = food_y > (adjustedindex / 2) * walls.height / 3  # ?????????????
+          check2 = food_y < ((adjustedindex / 2) + 1) * walls.height / 3  # ??????????
+          if (check1 and check2):
+            tempFood.append(food)
+        if len(tempFood) == 0:
+          tempFood = foodList
+        mazedist = [self.getMazeDistance((newx, newy), food) for food in tempFood]
+        if min(mazedist) is not None:
+          walldimensions = walls.width * walls.height
+          features["distanceToFood"] = float(min(mazedist)) / walldimensions
+"""
     return features
 
   def getWeights(self, gameState, action):
-    return {'numInvaders': -1000, 'onDefense': 100, 'invaderDistance': -10, 'stop': -100, 'reverse': -2}
+    return {'numInvaders': -1000, 'onDefense': 100, 'invaderDistance': -10, 'stop': -100, 'reverse': -2, 'distanceToFood': -1}
+
 
 
 
