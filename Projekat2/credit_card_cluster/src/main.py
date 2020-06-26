@@ -17,21 +17,22 @@ if __name__ == '__main__':
     vals = data.iloc[:, 1:].values
 
     # Use the Elbow method to find a good number of clusters using WCSS
-    wcss = []
-    for ii in range(1, 30):
-        kmeans = KMeans(n_clusters=ii, init="k-means++", n_init=10, max_iter=300)
-        kmeans.fit_predict(vals)
-        wcss.append(kmeans.inertia_)
+    # wcss = []
+    # for ii in range(1, 30):
+    #     kmeans = KMeans(n_clusters=ii, init="k-means++", n_init=10, max_iter=300)
+    #     kmeans.fit_predict(vals)
+    #     wcss.append(kmeans.inertia_)
+    #
+    # plt.plot(wcss, 'ro-', label="WCSS")
+    # plt.title("Computing WCSS for KMeans++")
+    # plt.xlabel("Number of clusters")
+    # plt.ylabel("WCSS")
+    # plt.show()
 
-    plt.plot(wcss, 'ro-', label="WCSS")
-    plt.title("Computing WCSS for KMeans++")
-    plt.xlabel("Number of clusters")
-    plt.ylabel("WCSS")
-    plt.show()
-
-    best_cols = ["BALANCE", "PURCHASES", "CREDIT_LIMIT", "PAYMENTS", "ONEOFF_PURCHASES_FREQUENCY", "PURCHASES_INSTALLMENTS_FREQUENCY", "PURCHASES_TRX"]
+    best_cols = ["BALANCE", "PURCHASES", "CREDIT_LIMIT", "PAYMENTS", "PURCHASES_TRX", "MINIMUM_PAYMENTS"]
+    #best_cols = ["BALANCE", "PURCHASES", "CASH_ADVANCE", "CREDIT_LIMIT", "PAYMENTS", "MINIMUM_PAYMENTS"]
     # iz lakta vidimo da je optimalan broj klastera oko 6
-    kmeans = KMeans(n_clusters=6, init="k-means++", n_init=10, max_iter=300)
+    kmeans = KMeans(n_clusters=8, init="k-means++", n_init=10, max_iter=300)
     best_vals = data[best_cols].iloc[:, 1:].values
     y_pred = kmeans.fit_predict(best_vals)
     data["cluster"] = y_pred
