@@ -6,8 +6,10 @@ import os
 import csv
 import tensorflow as tf
 from tensorflow import keras
+from keras import layers
+import pydot
+import pydotplus
 from tensorflow.keras.layers import Dense, Flatten, Conv2D
-
 
 
 
@@ -64,22 +66,73 @@ def classify_data(result):
         dest_folder = "classified/virus"
         shutil.move(source_folder, dest_folder)
 
+def make_model(input_shape, num_classes):
+    inputs = keras.Input(shape=input_shape)
+    # Image augmentation block
+    x = data_augmentation(inputs)
+
+    # Entry block
+    x = layers.experimental.preprocessing.Rescaling(1.0 / 255)(x)
+    x = layers.Conv2D(32, 3, strides=2, padding="same")(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation("relu")(x)
+
+    x = layers.Conv2D(64, 3, padding="same")(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation("relu")(x)
+
+    previous_block_activation = x  # Set aside residual
+
+    for size in [128, 256, 512, 728]:
+        x = layers.Activation("relu")(x)
+        x = layers.SeparableConv2D(size, 3, padding="same")(x)
+        x = layers.BatchNormalization()(x)
+
+        x = layers.Activation("relu")(x)
+        x = layers.SeparableConv2D(size, 3, padding="same")(x)
+        x = layers.BatchNormalization()(x)
+
+        x = layers.MaxPooling2D(3, strides=2, padding="same")(x)
+
+        # Project residual
+        residual = layers.Conv2D(size, 1, strides=2, padding="same")(
+            previous_block_activation
+        )
+        x = layers.add([x, residual])  # Add back residual
+        previous_block_activation = x  # Set aside next residual
+
+    x = layers.SeparableConv2D(1024, 3, padding="same")(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Activation("relu")(x)
+
+    x = layers.GlobalAveragePooling2D()(x)
+    if num_classes == 3:
+        activation = "sigmoid"
+        units = 1
+    else:
+        activation = "softmax"
+        units = num_classes
+
+    x = layers.Dropout(0.5)(x)
+    outputs = layers.Dense(units, activation=activation)(x)
+    return keras.Model(inputs, outputs)
+
 
 if __name__ == "__main__":
 
-    print("CITAM PODATKE")
-    result = read_data()
-    print("PREMENSTAM SLIKE")
-    classify_data(result)
+    #print("CITAM PODATKE")
+    #result = read_data()
+    #print("PREMENSTAM SLIKE")
+    #classify_data(result)
 
-    print("OBRADJENO")
+    #print("OBRADJENO")
     # Any results you write to the current directory are saved as output.
 
     image_size = (180, 180)
     batch_size = 32
 
     print("TRENIRANJE")
-    train_ds = keras.preprocessing.image_dataset_from_directory(
+    train_ds = tf.keras.preprocessing.image_dataset_from_directory(
         "classified",
         validation_split=0.2,
         subset="training",
@@ -88,7 +141,7 @@ if __name__ == "__main__":
         batch_size=batch_size,
     )
     print("VALIDACIJA")
-    val_ds = keras.preprocessing.image_dataset_from_directory(
+    val_ds = tf.keras.preprocessing.image_dataset_from_directory(
         "classified",
         validation_split=0.2,
         subset="validation",
@@ -96,17 +149,66 @@ if __name__ == "__main__":
         image_size=image_size,
         batch_size=batch_size,
     )
-    print("VIZUELIZACIJA")
-    #visualization
+    # print("VIZUELIZACIJA")
+    # #visualization
+    # plt.figure(figsize=(10, 10))
+    # for images, labels in train_ds.take(1):
+    #     for i in range(9):
+    #         ax = plt.subplot(3, 3, i + 1)
+    #         plt.imshow(images[i].numpy().astype("uint8"))
+    #         plt.title(int(labels[i]))
+    #         plt.axis("off")
+    # plt.show()
+
+    data_augmentation = keras.Sequential(
+        [
+            layers.experimental.preprocessing.RandomFlip("horizontal"),
+            layers.experimental.preprocessing.RandomRotation(0.1),
+        ]
+    )
     plt.figure(figsize=(10, 10))
-    for images, labels in train_ds.take(1):
+    for images, _ in train_ds.take(1):
         for i in range(9):
+            augmented_images = data_augmentation(images)
             ax = plt.subplot(3, 3, i + 1)
-            plt.imshow(images[i].numpy().astype("uint8"))
-            plt.title(int(labels[i]))
+            plt.imshow(augmented_images[0].numpy().astype("uint8"))
             plt.axis("off")
-    plt.show()
-    print("KRAJ")
+    augmented_train_ds = train_ds.map(
+        lambda x, y: (data_augmentation(x, training=True), y))
+    train_ds = train_ds.prefetch(buffer_size=32)
+    val_ds = val_ds.prefetch(buffer_size=32)
+
+    model = make_model(input_shape=image_size + (3,), num_classes=2)
+    keras.utils.plot_model(model, show_shapes=True)
+
+    epochs = 50
+
+    callbacks = [
+        keras.callbacks.ModelCheckpoint("save_at_{epoch}.h5"),
+    ]
+    model.compile(
+        optimizer=keras.optimizers.Adam(1e-3),
+        loss="binary_crossentropy",
+        metrics=["accuracy"],
+    )
+    model.fit(
+        train_ds, epochs=epochs, callbacks=callbacks, validation_data=val_ds,
+    )
+    img = keras.preprocessing.image.load_img(
+        "classified/bacteria/person1_bacteria_1.jpeg", target_size=image_size
+    )
+    img_array = keras.preprocessing.image.img_to_array(img)
+    img_array = tf.expand_dims(img_array, 0)  # Create batch axis
+
+    predictions = model.predict(img_array)
+    score = predictions[0]
+    print(
+        "This image is %.2f percent bacteria and %.2f percent other."
+        % (100 * (1 - score), 100 * score)
+    )
+
+
+
 
 
     # training_dir = "classified"

@@ -117,8 +117,7 @@ class OffensiveAgent(CaptureAgent):
 
       #kad smo presli preko i bezimo od neprijatelja, MORAMO DA GA VRATIMOOOOOOO KUCI
       if (myState.isPacman):
-        if myState.numCarrying >= 1:
-          print("Nasa situacija")
+        if myState.numCarrying >= 5:
           newFood = self.getFoodYouAreDefending(gameState).asList()
           minDist =  [self.getMazeDistance(myPos, a) for a in newFood]
         #  features['distanceToFood'] = min(minDist)
