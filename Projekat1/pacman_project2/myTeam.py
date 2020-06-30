@@ -60,6 +60,8 @@ class OffensiveAgent(CaptureAgent):
       """
       Picks among the actions with the highest Q(s,a).
       """
+
+      """
       actions = gameState.getLegalActions(self.index)
 
       # You can profile your evaluation time by uncommenting these lines
@@ -73,6 +75,68 @@ class OffensiveAgent(CaptureAgent):
       foodLeft = len(self.getFood(gameState).asList())
 
       return random.choice(bestActions)
+      """
+      numberOfGhosts = gameState.getNumAgents() - 1
+
+      # Used only for pacman agent hence agentindex is always 0.
+      def maxLevel(gameState, depth, nextAction, x, y):
+        currDepth = depth + 1
+        if gameState.isOver() or currDepth == 2:  # Terminal Test
+          return self.evaluate(gameState, nextAction, x, y)
+        maxvalue = -999999
+        actions = gameState.getLegalActions(self.index)
+        for action in actions:
+          vx, vy = Actions.directionToVector(action)  # vektor pomeraja
+          newx = int(x + vx)  # nova pozicija x
+          newy = int(y + vy)  # nova pozicija y
+          successor = gameState.generateSuccessor(self.index, action)
+          if(self.index % 2 == 0): #paran je
+            enemyIdx = 1
+          else:
+            enemyIdx = 0
+          maxvalue = max(maxvalue, minLevel(successor, currDepth, enemyIdx, action, newx, newy))
+        return maxvalue
+
+      # For all ghosts.
+      def minLevel(gameState, depth, agentIndex, nextAction, x, y):
+        minvalue = 999999
+        if gameState.isOver():  # Terminal Test
+          return self.evaluate(gameState, nextAction, x, y)
+        actions = gameState.getLegalActions(agentIndex) # akcije nasih neprijatelja
+        for action in actions:
+          vx, vy = Actions.directionToVector(action)  # vektor pomeraja
+          newx = int(x + vx)  # nova pozicija x
+          newy = int(y + vy)  # nova pozicija y
+          successor = gameState.generateSuccessor(agentIndex, action)
+          if agentIndex == 2 or agentIndex == 3:# da li je 2 ili 3
+            minvalue = min(minvalue, maxLevel(successor, depth, action, newx, newy))
+          else:
+            newx, newy = gameState.getAgentState(agentIndex+2).getPosition()
+            minvalue = min(minvalue, minLevel(successor, depth, agentIndex + 2, action, newx, newy))
+        return minvalue
+
+      # Root level action.
+      actions = gameState.getLegalActions(self.index)
+      currentScore = -999999
+      returnAction = ''
+      for action in actions:
+        print (action)
+        x, y = gameState.getAgentState(self.index).getPosition()
+        vx, vy = Actions.directionToVector(action)  # vektor pomeraja
+        newx = int(x + vx)  # nova pozicija x
+        newy = int(y + vy)  # nova pozicija y
+        nextState = gameState.generateSuccessor(self.index, action)
+        # Next level is a min level. Hence calling min for successors of the root.
+        if (self.index % 2 == 0):  # paran je
+          enemyIdx = 1
+        else:
+          enemyIdx = 0
+        score = minLevel(nextState, 0, enemyIdx, action, newx, newy)
+        # Choosing the action which is Maximum of the successors.
+        if score > currentScore:
+          returnAction = action
+          currentScore = score
+      return returnAction
 
     def getSuccessor(self, gameState, action):
       """
@@ -86,34 +150,36 @@ class OffensiveAgent(CaptureAgent):
       else:
         return successor
 
-    def evaluate(self, gameState, action):
+    def evaluate(self, gameState, action, posX, posY):
       """
       Computes a linear combination of features and feature weights
       """
-      features = self.getFeatures(gameState, action)
+      features = self.getFeatures(gameState, action, posX, posY)
       weights = self.getWeights(gameState, action)
       return features * weights
 
-    def getFeatures(self, gameState, action):
+    def getFeatures(self, gameState, action, posX, posY):
 
       features = util.Counter()
-      successor = self.getSuccessor(gameState, action)
+      #successor = self.getSuccessor(gameState, action)
       food1 = self.getFood(gameState)
       capsules = gameState.getCapsules()
       foodList = food1.asList()
       walls = gameState.getWalls()
-      x, y = gameState.getAgentState(self.index).getPosition()
+      posX, posY = gameState.getAgentState(self.index).getPosition()
       vx, vy = Actions.directionToVector(action)  # vektor pomeraja
-      newx = int(x + vx)  # nova pozicija x
-      newy = int(y + vy)  # nova pozicija y
+      newx = int(posX + vx)  # nova pozicija x
+      newy = int(posY + vy)  # nova pozicija y
 
       # Get set of invaders and defenders
       enemies = [gameState.getAgentState(a) for a in self.getOpponents(gameState)]
       invaders = [a for a in enemies if not a.isPacman and a.getPosition() != None]  # napadaju nas duhovi, mi pacman
       defenders = [a for a in enemies if a.isPacman and a.getPosition() != None]  # mi duhovi njih napadamo pacmane
 
-      myState = successor.getAgentState(self.index)
-      myPos = myState.getPosition()
+      #myState = successor.getAgentState(self.index)
+
+      myState = gameState.getAgentState(self.index)
+      myPos = posX, posY # neke prosledjene koordinate
 
       #kad smo presli preko i bezimo od neprijatelja, MORAMO DA GA VRATIMOOOOOOO KUCI
       if (myState.isPacman):
@@ -171,6 +237,8 @@ class OffensiveAgent(CaptureAgent):
 
       #na pocetku smo duhovi, nismo uplaseni, nemamo hranu blizu, nemamo neprijatelje, cilj je da predjemo preko
       #trazimo najblizu hranu!!!
+
+
       if not features["normalGhosts"]:
         if food1[newx][newy]:
           features["eatFood"] = 1.0
@@ -208,6 +276,8 @@ class DefensiveAgent(CaptureAgent):
     """
     Picks among the actions with the highest Q(s,a).
     """
+
+
     actions = gameState.getLegalActions(self.index)
 
     # You can profile your evaluation time by uncommenting these lines
