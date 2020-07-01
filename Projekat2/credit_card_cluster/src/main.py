@@ -78,35 +78,36 @@ if __name__ == '__main__':
     data = data.fillna(data.median())
     print(data.isna().sum())
 
-    # Let's assume we use all cols except CustomerID
+    # Uzimamo kolone bez Customer_ID
     vals = data.iloc[:, 1:].values
 
-    # Use the Elbow method to find a good number of clusters using WCSS
-    # wcss = []
-    # for ii in range(1, 30):
-    #     kmeans = KMeans(n_clusters=ii, init="k-means++", n_init=10, max_iter=300)
-    #     kmeans.fit_predict(vals)
-    #     wcss.append(kmeans.inertia_)
-    #
-    # plt.plot(wcss, 'ro-', label="WCSS")
-    # plt.title("Computing WCSS for KMeans++")
-    # plt.xlabel("Number of clusters")
-    # plt.ylabel("WCSS")
-    # plt.show()
+    # lakat kriva iz koje zakljucujemo da je
+    # optimalan broj klastera 7
+    wcss = []
+    for ii in range(1, 30):
+        kmeans = KMeans(n_clusters=ii, init="k-means++", n_init=10, max_iter=300)
+        kmeans.fit_predict(vals)
+        wcss.append(kmeans.inertia_)
+
+    plt.plot(wcss, 'ro-', label="WCSS")
+    plt.title("Computing WCSS for KMeans++")
+    plt.xlabel("Number of clusters")
+    plt.ylabel("WCSS")
+    plt.show()
 
     best_cols = ["BALANCE", "PURCHASES", "CREDIT_LIMIT", "PAYMENTS", "PURCHASES_TRX", "MINIMUM_PAYMENTS"]
-    # best_cols = ["BALANCE", "PURCHASES", "CASH_ADVANCE", "CREDIT_LIMIT", "PAYMENTS", "MINIMUM_PAYMENTS"]
     # iz lakta vidimo da je optimalan broj klastera oko 6
-    kmeans = KMeans(n_clusters=8, init="k-means++", n_init=10, max_iter=300)
+    kmeans = KMeans(n_clusters=7, init="k-means++", n_init=10, max_iter=300)
     best_vals = data[best_cols].iloc[:, 1:].values
     y_pred = kmeans.fit_predict(best_vals)
 
+    # rezultati klasterovanja u 2D prikazu
     data["cluster"] = y_pred
     best_cols.append("cluster")
 
-    #sns.pairplot(data[best_cols], hue="cluster")
+    sns.pairplot(data[best_cols], hue="cluster")
 
-    cluster_report(data, y_pred, min_samples_leaf=50, pruning_level=0.001)
+    cluster_report(data, y_pred, min_samples_leaf=100, pruning_level=0.001) #0.001
     plt.show()
 
 
