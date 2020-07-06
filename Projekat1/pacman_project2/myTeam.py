@@ -60,30 +60,10 @@ class OffensiveAgent(CaptureAgent):
       """
       Picks among the actions with the highest Q(s,a).
       """
-
-      """
-      actions = gameState.getLegalActions(self.index)
-
-      # You can profile your evaluation time by uncommenting these lines
-      # start = time.time()
-      values = [self.evaluate(gameState, a) for a in actions]
-      # print 'eval time for agent %d: %.4f' % (self.index, time.time() - start)
-
-      maxValue = max(values)
-      bestActions = [a for a, v in zip(actions, values) if v == maxValue]
-
-      foodLeft = len(self.getFood(gameState).asList())
-
-      return random.choice(bestActions)
-      """
-
-
-      # Used only for pacman agent hence agentindex is always 0.
       def maxLevel(gameState, depth, nextAction):
         currDepth = depth + 1
         if gameState.isOver() or currDepth == 2:  # Terminal Test
           evaluate = self.evaluate(gameState, nextAction,self.index)
-          #print("max evaluate vrednost za agenta ", self.index, " i akciju : ", nextAction, " je; ", evaluate)
           return evaluate
         maxvalue = -999999
         actions = gameState.getLegalActions(self.index)
@@ -97,17 +77,13 @@ class OffensiveAgent(CaptureAgent):
             maxvalue = max(maxvalue, minLevel(successor, currDepth, enemyIdx, action))
         return maxvalue
 
-      # For all ghosts.
       def minLevel(gameState, depth, agentIndex, nextAction):
-
         minvalue = 999999
         if gameState.isOver()  or depth == 2:  # Terminal Test
           evaluate = self.evaluate(gameState, nextAction, agentIndex)
-          #print("min evaluate vrednost za agenta ", agentIndex, " i akciju : ", nextAction, " je; ", evaluate)
           return evaluate
 
         actions = gameState.getLegalActions(agentIndex) # akcije nasih neprijatelja
-        #print(agentIndex, actions)
         for action in actions:
           try:
             if (str(action) == "Stop"):
@@ -115,17 +91,14 @@ class OffensiveAgent(CaptureAgent):
             successor = gameState.generateSuccessor(agentIndex, action)
           except:
             continue
-          if agentIndex == 2 or agentIndex == 3:# da li je 2 ili 3
-            # print("***min 2 ili 3")
+          if agentIndex == 2 or agentIndex == 3:
             currDepth = depth + 1
             minvalue = min(minvalue, maxLevel(successor, currDepth, action))
           else:
-            # print("***min usao sam na sl ")
             agentIndex += 2
             minvalue = min(minvalue, minLevel(successor, depth, agentIndex, action))
         return minvalue
 
-      # Root level action.
       actions = gameState.getLegalActions(self.index)
       currentScore = -999999
       returnAction = ''
@@ -133,13 +106,11 @@ class OffensiveAgent(CaptureAgent):
         if(str(action) == "Stop"):
             continue
         nextState = gameState.generateSuccessor(self.index, action)
-        # Next level is a min level. Hence calling min for successors of the root.
         if (self.index % 2 == 0):  # paran je
           enemyIdx = 1
         else:
           enemyIdx = 0
         score = minLevel(nextState, 0, enemyIdx, action)
-        # Choosing the action which is Maximum of the successors.
         if score > currentScore:
           returnAction = action
           currentScore = score
@@ -170,7 +141,6 @@ class OffensiveAgent(CaptureAgent):
       tempidx = self.index
       self.index = agentIndex
       features = util.Counter()
-      # successor = self.getSuccessor(gameState, action)
       food1 = self.getFood(gameState)
       capsules = gameState.getCapsules()
       foodList = food1.asList()
@@ -179,23 +149,20 @@ class OffensiveAgent(CaptureAgent):
       newx = int(posX)  # nova pozicija x
       newy = int(posY)
 
-      # Get set of invaders and defenders
+
       enemies = [gameState.getAgentState(a) for a in self.getOpponents(gameState)]
       invaders = [a for a in enemies if not a.isPacman and a.getPosition() != None]  # napadaju nas duhovi, mi pacman
-      defenders = [a for a in enemies if a.isPacman and a.getPosition() != None]  # mi duhovi njih napadamo pacmane
+      defenders = [a for a in enemies if a.isPacman and a.getPosition() != None]  # mi duhovi njih napadamo (pacmane)
 
-      # myState = successor.getAgentState(self.index)
 
       myState = gameState.getAgentState(self.index)
       myPos = posX, posY  # neke prosledjene koordinate
 
-      # kad smo presli preko i bezimo od neprijatelja, MORAMO DA GA VRATIMOOOOOOO KUCI
-      if (myState.isPacman):  # vracamo se kuci
-        if myState.numCarrying >= 2:
-          print("sad cu kuci")
+      # kad smo presli preko i bezimo od neprijatelja
+      if (myState.isPacman):
+        if myState.numCarrying >= 2: # vracamo se kuci
           newFood = self.getFoodYouAreDefending(gameState).asList()
           minDist = [self.getMazeDistance(myPos, a) for a in newFood]
-          #  features['distanceToFood'] = min(minDist)
           features['backToSafeZone'] = min(minDist)
           features['normalGhosts'] = 1  # NE JEDI
 
@@ -204,77 +171,60 @@ class OffensiveAgent(CaptureAgent):
           for ghost in invaders:
             ghostpos = ghost.getPosition()
             neighbors = Actions.getLegalNeighbors(ghostpos, walls)
-            if (newx, newy) == ghostpos and ghost.scaredTimer == 0:
-              features["normalGhosts"] = 1  # ne idemo na hranu?
-              # DA LI DODATI FEATURE?
+            if (newx, newy) == ghostpos and ghost.scaredTimer == 0: #duh nije uplasen, a poklapaju nam se pozicije >> bezimo
+              print('BEZIM OD DUHA')
+              features["normalGhosts"] = 1
               features['run'] = 100
-            elif (newx, newy) == ghostpos and ghost.scaredTimer > 0:
-              print("duh uplasen idemo na hranu")
+            elif (newx, newy) == ghostpos and ghost.scaredTimer > 0: #duh uplasen mi ipak idemo na hranu
               features["normalGhosts"] = 0
               #features["eatFood"] = 500
-            elif ((newx, newy) in neighbors) and (ghost.scaredTimer == 0):
+            elif ((newx, newy) in neighbors) and (ghost.scaredTimer == 0): #duh u komsiluku >> bezimo
               features["normalGhosts"] = 1
               dists = [self.getMazeDistance(myPos, a.getPosition()) for a in invaders]
               features['ghostInvaders'] = min(dists)
-            elif ((newx, newy) not in neighbors) and (ghost.scaredTimer == 0):
+              features['run'] = 100
+            elif ((newx, newy) not in neighbors) and (ghost.scaredTimer == 0): #duh nije u komsiluku
               features["normalGhosts"] = 0
-              #print("LJUBORNA SAM NA SVEEEEEEEEE")
-              features["cobane"] = 100
-            elif ((newx, newy) in neighbors) and ghost.scaredTimer > 0:
-              print('JE L MENE OVDE NEKO ZAJEBAVA')
+            elif ((newx, newy) in neighbors) and ghost.scaredTimer > 0: #u komsiluku uplasen
               features["normalGhosts"] = 1  # idemo na hranu
               #features["eatFood"] = 100
 
-            # else:
-            #   dists = [self.getMazeDistance(myPos, a.getPosition()) for a in invaders]
-            #   if(min(dists) <= 2 and ghost.scaredTimer == 0):  # treba da duh nije uplasen
-            #     print("BEZIM")
-            #     features['ghostInvaders'] = min(dists)   # ako je blizu ne jedemo
-            #     features['normalGhosts'] = 1  # ako je blizu ne jedemo
-            #     print(features, "bezimo")
-            #   elif(min(dists) > 2 and ghost.scaredTimer == 0):
-            #     print("ne bezim")
-            #     features['eatFood'] = 100
-
       # MI SMO DUH
       if not myState.isPacman:
-        if (len(defenders) == 0):
+        if (len(defenders) == 0): #nema pacmana, idemo na hranu
           features["normalGhosts"] = 0
           features["eatFood"] = 1
         for pacman in defenders:
           pacmanpos = pacman.getPosition()
           neighbors = Actions.getLegalNeighbors(pacmanpos, walls)
           dists = [self.getMazeDistance(myPos, a.getPosition()) for a in defenders]
-          features['invaderDistance'] = min(dists)
-          if (newx, newy) == pacmanpos and myState.scaredTimer == 0:  # JEDEMO njega PACMANA
+          features['invaderDistance'] = min(dists) #jurimo najblizeg neprijatelja
+          if (newx, newy) == pacmanpos and myState.scaredTimer == 0:  # poklapaju nam se pozicije, pojescemo pacmana
             features["eatFood"] = -5
-            features["normalGhosts"] = 0
+            features["normalGhosts"] = 1
           elif (newx, newy) == pacmanpos and myState.scaredTimer > 0:  # idemo prema hrani da bismo pobegli od pacmana
-            features["normalGhosts"] = 0  # bila 0
+            features["normalGhosts"] = 0
             features["scaredGhost"] = 1
           elif ((newx, newy) in neighbors) and (myState.scaredTimer == 0):
-            features["normalGhosts"] = 1  # ignorisemo situaciju
+            features["normalGhosts"] = 1  # ne idemo ka hrani, nego jurimo pacmana
             features['invaderDistance'] = min(dists)
-            #features["eatFood"] = 0.100  # ako nam neprijatelj u komsiluku, idmeo da ga POJEDEMO, potencijalno dobar potez
-          elif ((newx, newy) in neighbors) and myState.scaredTimer > 0:
-            features["normalGhosts"] = 0  # ignorisemo situaciju, bila 0
-            features["scaredGhost"] = 1
-          else:
+          elif ((newx, newy) in neighbors) and myState.scaredTimer > 0: #pacman tu mi uplaseni, idemo ka hrani da bi pobegli
             features["normalGhosts"] = 0
-      # na pocetku smo duhovi, nismo uplaseni, nemamo hranu blizu, nemamo neprijatelje, cilj je da predjemo preko
-      # trazimo najblizu hranu!!!
+            features["scaredGhost"] = 1
+          else: #ako nema nista idemo ka hrani
+            features["normalGhosts"] = 0
 
+      #idemo ka najblizoj hrani
       if not features["normalGhosts"]:
         if food1[newx][newy]:
           features["eatFood"] = -100
         if len(foodList) > 0:
-          #print("BUBICE")
           tempFood = []
           for food in foodList:
             food_x, food_y = food
             adjustedindex = self.index - self.index % 2
-            check1 = food_y > (adjustedindex / 2) * walls.height / 3 # ?????????????
-            check2 = food_y < ((adjustedindex / 2) + 1) * walls.height / 3 # ??????????
+            check1 = food_y > (adjustedindex / 2) * walls.height / 3
+            check2 = food_y < ((adjustedindex / 2) + 1) * walls.height / 3 
             if (check1 and check2):
               tempFood.append(food)
           if len(tempFood) == 0:
@@ -282,22 +232,17 @@ class OffensiveAgent(CaptureAgent):
           mazedist = [self.getMazeDistance((newx, newy), food) for food in tempFood]
           if min(mazedist) is not None:
             walldimensions = walls.width * walls.height
-            # features["distanceToFood"] = float(min(mazedist)) / walldimensions
             features["distanceToFood"] = float(min(mazedist)) / walldimensions
-            #print(features)
-      # treba da ga vratimo kuci
+
       self.index = tempidx
+
       return features
 
 
     def getWeights(self, gameState, action):
       return {'normalGhosts': 0, 'distanceToFood': -1, 'eatFood': -1, 'invaderDistance': -10,
-          'ghostInvaders': -10, 'scaredGhost': -10, 'backToSafeZone': -1, 'run': -1, 'cobane': 1}
+          'ghostInvaders': -10, 'scaredGhost': -10, 'backToSafeZone': -1, 'run': -1}
 
-#return {'normalGhosts': 0, 'distanceToFood': -1, 'eatFood': -1, 'invaderDistance': -10,
-          #'ghostInvaders': 0.00195, 'scaredGhost': -1, 'backToSafeZone': 0.00195, 'run': -1}
-# return {'normalGhosts':-20, 'distanceToFood': -1, 'eatFood': -1, 'invaderDistance': -10, 'run': -10,
-#         'ghostInvaders': 0.00195, 'scaredGhost': -20, 'backToSafeZone': -1, 'reverse': 10}
 
 
 class DefensiveAgent(CaptureAgent):
@@ -311,54 +256,15 @@ class DefensiveAgent(CaptureAgent):
     self.start = gameState.getAgentPosition(self.index)
     CaptureAgent.registerInitialState(self, gameState)
 
-  # def chooseAction(self, gameState):
-  #   """
-  #   Picks among the actions with the highest Q(s,a).
-  #   """
-  #   actions = gameState.getLegalActions(self.index)
-  #
-  #   # You can profile your evaluation time by uncommenting these lines
-  #   # start = time.time()
-  #   actions1 = []
-  #   for a in actions:
-  #     if (str(a) != "Stop"):
-  #       actions1.append(a)
-  #   values = [self.evaluate(gameState, a) for a in actions1]
-  #   # print 'eval time for agent %d: %.4f' % (self.index, time.time() - start)
-  #
-  #   maxValue = max(values)
-  #   bestActions = [a for a, v in zip(actions, values) if v == maxValue]
-  #
-  #   foodLeft = len(self.getFood(gameState).asList())
-  #
-  #   return random.choice(bestActions)
   def chooseAction(self, gameState):
     """
     Picks among the actions with the highest Q(s,a).
     """
 
-    """
-    actions = gameState.getLegalActions(self.index)
-
-    # You can profile your evaluation time by uncommenting these lines
-    # start = time.time()
-    values = [self.evaluate(gameState, a) for a in actions]
-    # print 'eval time for agent %d: %.4f' % (self.index, time.time() - start)
-
-    maxValue = max(values)
-    bestActions = [a for a, v in zip(actions, values) if v == maxValue]
-
-    foodLeft = len(self.getFood(gameState).asList())
-
-    return random.choice(bestActions)
-    """
-
-    # Used only for pacman agent hence agentindex is always 0.
     def maxLevel(gameState, depth, nextAction):
       currDepth = depth + 1
       if gameState.isOver() or currDepth == 2:  # Terminal Test
         evaluate = self.evaluate(gameState, nextAction, self.index)
-        # print("max evaluate vrednost za agenta ", self.index, " i akciju : ", nextAction, " je; ", evaluate)
         return evaluate
       maxvalue = -999999
       actions = gameState.getLegalActions(self.index)
@@ -372,17 +278,15 @@ class DefensiveAgent(CaptureAgent):
           maxvalue = max(maxvalue, minLevel(successor, currDepth, enemyIdx, action))
       return maxvalue
 
-    # For all ghosts.
+
     def minLevel(gameState, depth, agentIndex, nextAction):
 
       minvalue = 999999
       if gameState.isOver() or depth == 2:  # Terminal Test
         evaluate = self.evaluate(gameState, nextAction, agentIndex)
-        # print("min evaluate vrednost za agenta ", agentIndex, " i akciju : ", nextAction, " je; ", evaluate)
         return evaluate
 
       actions = gameState.getLegalActions(agentIndex)  # akcije nasih neprijatelja
-      # print(agentIndex, actions)
       for action in actions:
         try:
           if (str(action) == "Stop"):
@@ -390,17 +294,14 @@ class DefensiveAgent(CaptureAgent):
           successor = gameState.generateSuccessor(agentIndex, action)
         except:
           continue
-        if agentIndex == 2 or agentIndex == 3:  # da li je 2 ili 3
-          # print("***min 2 ili 3")
+        if agentIndex == 2 or agentIndex == 3:
           currDepth = depth + 1
           minvalue = min(minvalue, maxLevel(successor, currDepth, action))
         else:
-          # print("***min usao sam na sl ")
           agentIndex += 2
           minvalue = min(minvalue, minLevel(successor, depth, agentIndex, action))
       return minvalue
 
-    # Root level action.
     actions = gameState.getLegalActions(self.index)
     currentScore = -999999
     returnAction = ''
@@ -408,13 +309,12 @@ class DefensiveAgent(CaptureAgent):
       if (str(action) == "Stop"):
         continue
       nextState = gameState.generateSuccessor(self.index, action)
-      # Next level is a min level. Hence calling min for successors of the root.
       if (self.index % 2 == 0):  # paran je
         enemyIdx = 1
       else:
         enemyIdx = 0
       score = minLevel(nextState, 0, enemyIdx, action)
-      # Choosing the action which is Maximum of the successors.
+
       if score > currentScore:
         returnAction = action
         currentScore = score
@@ -446,7 +346,6 @@ class DefensiveAgent(CaptureAgent):
     tempidx = self.index
     self.index = agentIndex
     features = util.Counter()
-    # successor = self.getSuccessor(gameState, action)
     food1 = self.getFood(gameState)
     capsules = gameState.getCapsules()
     foodList = food1.asList()
@@ -455,7 +354,6 @@ class DefensiveAgent(CaptureAgent):
     newx = int(posX)  # nova pozicija x
     newy = int(posY)
 
-    #successor = self.getSuccessor(gameState, action)
 
     food1 = self.getFood(gameState)
     capsules = gameState.getCapsules()
@@ -472,17 +370,13 @@ class DefensiveAgent(CaptureAgent):
         newFood = self.getFoodYouAreDefending(gameState).asList()
         minDist = [self.getMazeDistance(myPos, a) for a in newFood]
         features['distanceToFood'] = min(minDist)
-        # print("BUBICE")
         features['onDefense'] = 1
         if action == Directions.STOP: features['stop'] = 1
         rev = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
         if action == rev: features['reverse'] = 1
-        #self.idemKuci = True
         print(features, action, "SGSAJALKJFBLKAHERKJBNALKFDJNB")
         return features
 
-
-    # Computes distance to invaders we can see
     enemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
     invaders = [a for a in enemies if a.isPacman and a.getPosition() != None]
     features['numInvaders'] = len(invaders)
@@ -498,13 +392,12 @@ class DefensiveAgent(CaptureAgent):
       if food1[newx][newy]:
         features["eatFood"] = -100
       if len(foodList) > 0:
-        #print("BUBICE")
         tempFood = []
         for food in foodList:
           food_x, food_y = food
           adjustedindex = self.index - self.index % 2
-          check1 = food_y > (adjustedindex / 2) * walls.height / 3  # ?????????????
-          check2 = food_y < ((adjustedindex / 2) + 1) * walls.height / 3  # ??????????
+          check1 = food_y > (adjustedindex / 2) * walls.height / 3
+          check2 = food_y < ((adjustedindex / 2) + 1) * walls.height / 3
           if (check1 and check2):
             tempFood.append(food)
         if len(tempFood) == 0:
